@@ -1,0 +1,244 @@
+---
+title: "GSEA analysis"
+author: "Kelly"
+date: "12/05/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# Loading packages
+
+```{r packages}
+library(readr)
+library(ggplot2)
+library(dplyr)
+library(ggrepel)
+library(limma)
+library(tibble)
+library(magrittr)
+library(dplyr)
+library(reshape2)
+library(pheatmap)
+library(viridis)
+library(hrbrthemes)
+library(ggVennDiagram)
+library(tidyr)
+'%!in%' <- function(x,y)!('%in%'(x,y))
+```
+
+# ID sequence match
+```{r}
+Alignment_sequence <- read.table("Alignment_sequence.txt", sep = "\t",comment.char="#")%>%
+set_colnames(c("query","subject","identity","alignment_length","mismatches","gap_opens","q_start","q_end","s_start","s_end","evalue","bit_score","positives"))
+
+Alignment_sequence <- base::split(Alignment_sequence, Alignment_sequence$query)
+
+Alignment_sequence <- lapply(c(1:length(Alignment_sequence)),FUN = function(a){
+  top <- Alignment_sequence[[a]] %>%
+  arrange(desc(identity))
+top <- top[1,]
+  }) %>%
+  do.call("rbind",.)
+```
+
+```{r}
+#compare_ID <- read_table("compare_ID.txt")
+```
+
+# Data import
+
+```{r}
+setwd("~/Documents/Kelly_2021/Research/Tian_Camel_PhD/Kelly_iTRAQ_Data_analysis_11242021")
+Quantitation_report <- read.csv("Quantitation_report_with_immune.csv")%>%
+  as.data.frame()
+```
+
+```{r}
+ALNA_area <- Quantitation_report[7:10] 
+ALNA_area <- ALNA_area == 0
+
+none <-  ALNA_area%>%
+  apply(MARGIN = 1, all)
+
+Quantitation_report[none,]
+```
+
+
+
+```{r}
+Quantitation_report$Probability%>%table()
+
+# 100.00%  50.00%  97.50%  97.60%  97.70%  97.80%  97.90%  98.00%  98.10%  98.20%  98.30%  98.40%  98.50%  98.60%  98.70%  98.80% 
+#    1812       1       2      11       3      16       8       7      11      11      13      13      12      12      12      10 
+#  98.90%  99.00%  99.10%  99.20%  99.30%  99.40%  99.50%  99.60%  99.70%  99.80%  99.90% 
+#      17      20      10      17      28      22      37      50      74     141     143 
+Quantitation_report%<>%
+  subset(Quantitation_report$Probability == "100.00%")
+
+Quantitation_report%<>%
+  subset(PPS1 %!in% "No Values")%<>%
+  subset(PPS1 %!in% "Reference Missing")
+
+Quantitation_report$Coverage <- Quantitation_report$Coverage%>%
+  gsub("%","",.)%>%
+  as.numeric()
+Quantitation_report%>%arrange(desc(Coverage))
+# See distribution 
+
+#Quantitation_report%<>%filter(Coverage > 40)
+as.character(Quantitation_report$Probability)%>%
+  table()%>%
+  plot()
+```
+```{r}
+subset(Quantitation_report, Immune %in% "Yes")
+```
+
+# LMFR_PPS
+```{r}
+Quantitation_report_LMFR_PPS <- Quantitation_report[,c(1,5,6,7,8,11,12,13,20,21,22:28)]%>%
+  mutate(FDR=p.adjust(Pvalue_LMFR_PPS,"fdr"))%>%
+  arrange(FDR)%>%
+  subset(FDR < 0.05)%>%
+  subset(abs(as.numeric(FC_LMFR_PPS)) > 1)
+
+Quantitation_report_LMFR_PPS$Regulated_LMFR_PPS%>%
+  table
+
+plot <- Quantitation_report_LMFR_PPS$Regulated_LMFR_PPS%>%
+  table%>%
+  as.data.frame()%>%
+  set_colnames(c("regulation","value"))%>%
+  ggplot(aes(x="", y=value, fill=regulation))+
+geom_bar(width = 1, stat = "identity")
+
+plot + 
+  coord_polar("y", start=0) +
+  theme_bw()
+
+```
+
+# RMFR_PPS
+```{r}
+Quantitation_report_RMFR_PPS <- Quantitation_report[,c(1,14,15,16,20,21,22:28)]%>%
+  mutate(FDR=p.adjust(Pvalue_RMFR_PPS,"fdr"))%>%
+  arrange(FDR)%>%
+  subset(FDR < 0.05)%>%
+  subset(abs(as.numeric(FC_RMFR_PPS)) > 1)
+
+Quantitation_report_RMFR_PPS$Regulated_RMFR_PPS%>%
+  table
+
+plot <- Quantitation_report_RMFR_PPS$Regulated_RMFR_PPS%>%
+  table%>%
+  as.data.frame()%>%
+  set_colnames(c("regulation","value"))%>%
+  ggplot(aes(x="", y=value, fill=regulation))+
+geom_bar(width = 1, stat = "identity")
+
+plot + coord_polar("y", start=0)+
+  theme_bw()
+
+```
+
+# RMFR_LMFR
+```{r}
+Quantitation_report_RMFR_LMFR <- Quantitation_report[,c(1,17,18,19,20,21,22:28)]%>%
+  mutate(FDR=p.adjust(Pvalue_RMFR_LMFR,"fdr"))%>%
+  arrange(FDR)%>%
+  subset(FDR < 0.05)%>%
+  subset(abs(as.numeric(FC_RMFR_LMFR)) > 1)
+
+Quantitation_report_RMFR_LMFR$Regulated_RMFR_LMFR%>%
+  table
+
+plot <- Quantitation_report_RMFR_LMFR$Regulated_RMFR_LMFR%>%
+  table%>%
+  as.data.frame()%>%
+  set_colnames(c("regulation","value"))%>%
+  ggplot(aes(x="", y=value, fill=regulation))+
+geom_bar(width = 1, stat = "identity")
+
+plot + coord_polar("y", start=0)+
+  theme_bw()
+
+# LMFR most difference with the PPS
+# RMFR next
+```
+
+```{r}
+
+ggVennDiagram_list <-list()
+ggVennDiagram_list$LMFR_vs_PPS <- Quantitation_report_LMFR_PPS$Accession
+ggVennDiagram_list$RMFR_vs_PPS <- Quantitation_report_RMFR_PPS$Accession
+ggVennDiagram_list$RMFR_vs_LMFR <- Quantitation_report_RMFR_LMFR$Accession
+
+ggVennDiagram(ggVennDiagram_list, label = "count")
+```
+
+# heatmap
+```{r}
+
+Filtered_Quantitation_report <- subset(Quantitation_report, Accession %in% unique(unlist(ggVennDiagram_list)))
+
+
+Filtered_Quantitation_report_plot <- Filtered_Quantitation_report[,c(1,6,7,8,9,10)]%>%
+  melt(na.rm = T, "Accession") 
+  
+ggplot(Filtered_Quantitation_report_plot,aes(x=variable, y=Accession, fill=as.numeric(value))) + 
+  geom_tile() +
+  scale_fill_viridis(discrete=FALSE) +
+  theme_ipsum()
+
+Filtered_Quantitation_report_plot <- Filtered_Quantitation_report[,c(21,5,6,7,8,9,10)]
+Filtered_Quantitation_report_plot$Description <- gsub("\\[.*","",Filtered_Quantitation_report_plot$Description)
+Filtered_Quantitation_report_plot$Description <- gsub("\\;.*","",Filtered_Quantitation_report_plot$Description)
+Filtered_Quantitation_report_plot$Description <- gsub("\\(.*","",Filtered_Quantitation_report_plot$Description)
+Filtered_Quantitation_report_plot%<>%
+  melt(na.rm = T, "Description")
+
+dim(Filtered_Quantitation_report_plot)
+Filtered_Quantitation_report_plot <- Filtered_Quantitation_report_plot[Filtered_Quantitation_report_plot$Description != "Na",]
+
+Filtered_Quantitation_report_plot <- Filtered_Quantitation_report_plot %>% subset(variable %!in% "PPS1")
+ggplot(Filtered_Quantitation_report_plot,aes(x=variable, y=Description, fill=as.numeric(value))) + 
+  geom_tile() +
+  scale_fill_viridis(discrete=FALSE) +
+  theme_ipsum()
+Filtered_Quantitation_report_plot```
+# immune
+```{r}
+Quantitation_report <- subset(Quantitation_report, Immune %in% "Yes")
+dim(subset(Quantitation_report, Immune %in% "Yes"))
+
+Filtered_Quantitation_report <- Quantitation_report%>%
+  subset(Uniprot_Tremble.Accession %in% c(Quantitation_report_LMFR_PPS$Uniprot_Tremble.Accession,Quantitation_report_RMFR_PPS$Uniprot_Tremble.Accession,Quantitation_report_RMFR_LMFR$Uniprot_Tremble.Accession))%>%
+  unique()
+
+LMFR_PPS_Quantitation_report <- Quantitation_report %>%
+  subset(Pvalue_LMFR_PPS < 0.0000001)
+
+Filtered_Quantitation_report_plot <- Filtered_Quantitation_report[,c(1,5,6,7,8,9,10)]%>%
+  melt(na.rm = T, "Accession")
+
+ggplot(Filtered_Quantitation_report_plot,aes(x=variable, y=Accession, fill=as.numeric(value))) + 
+  geom_tile() +
+  scale_fill_viridis(discrete=FALSE) +
+  theme_ipsum()
+
+Filtered_Quantitation_report_plot <- Filtered_Quantitation_report[,c(21,5,6,7,8,9,10)]
+Filtered_Quantitation_report_plot$Description <- gsub("\\[.*","",Filtered_Quantitation_report_plot$Description)
+Filtered_Quantitation_report_plot$Description <- gsub("\\;.*","",Filtered_Quantitation_report_plot$Description)
+Filtered_Quantitation_report_plot$Description <- gsub("\\(.*","",Filtered_Quantitation_report_plot$Description)
+Filtered_Quantitation_report_plot%<>%
+  melt(na.rm = T, "Description")
+
+ggplot(Filtered_Quantitation_report_plot,aes(x=variable, y=Description, fill=as.numeric(value))) + 
+  geom_tile() +
+  scale_fill_viridis(discrete=FALSE) +
+  theme_ipsum()
+```
+
+

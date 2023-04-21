@@ -1,0 +1,115 @@
+---
+title: "GSEA analysis"
+author: "Kelly"
+date: "12/05/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# Loading packages
+
+```{r packages}
+library(readr)
+library(ggplot2)
+library(dplyr)
+library(ggrepel)
+library(limma)
+library(tibble)
+library(magrittr)
+library(dplyr)
+library(reshape2)
+library(pheatmap)
+library(viridis)
+library(hrbrthemes)
+library(ggVennDiagram)
+library(tidyr)
+library(ReactomePA)
+library(clusterProfiler)
+library(biomaRt)
+
+'%!in%' <- function(x,y)!('%in%'(x,y))
+```
+
+# read the protein for 
+```{r}
+#Quantitation_report_with_immune <- read_csv("Quantitation_report_ALNA_with_immune.csv")
+Quantitation_report_with_immune <- read_csv("Quantitation_report_LMFR_PPS_with_immune.csv")
+Quantitation_report_with_immune <- read_csv("Quantitation_report_RMFR_LMFR_with_immune.csv")
+Quantitation_report_with_immune <- read_csv("Quantitation_report_RMFR_PPS_with_immune.csv")
+
+Quantitation_report_with_immune <- read_csv("Quantitation_report_with_immune.csv")
+
+
+Quantitation_report_with_immune %<>% subset(Quantitation_report_with_immune$Immune %in% "Yes")
+Quantitation_report_with_immune <- Quantitation_report_with_immune[!((Quantitation_report_with_immune[,c(7,8,9,10)] %>% apply(MARGIN = 1, FUN = sum)) == 0),]
+```
+
+
+
+```{r}
+if(interactive()){
+    Human = useMart("ensembl")
+    Human = useMart(biomart="ensembl", dataset="hsapiens_gene_ensembl")
+}
+
+### GO terms match their entrezgene_id and ensembl_gene_id
+ALL_Human_genes <- getBM(
+  attributes= c("ensembl_gene_id", "external_gene_name", "description", "entrezgene_id"), mart= Human)
+
+```
+
+
+```{r  Here you build a full entrezID pool for your dataset}
+ALL_Human_genes <- ALL_Human_genes %>% 
+  subset(entrezgene_id%in%ALL_Human_genes$entrezgene_id) %>% 
+  subset(!is.na(entrezgene_id)) %>%
+  .[["entrezgene_id"]] %>%
+  unlist() %>%
+  unique() 
+
+length(ALL_Human_genes) # your data related to 25688  entrez gene id
+```
+
+```{r }
+goRes <- goana(Quantitation_report_with_immune$Hsap_entrez, ALL_Human_genes, species = "Hs")
+
+goRes <- goRes %>% 
+  rownames_to_column("goid") %>%
+  mutate(adjP = p.adjust(P.DE, method = "fdr"))%>%
+  subset(adjP < 0.01) %>%
+  arrange(adjP) %>% # don't forget adjust p-vaules
+  as_tibble()
+
+goRes 
+
+head(goRes, n = 300) %>% 
+  extract2("goid") %>% 
+  as.data.frame()
+```
+
+```{r }
+keggRes <- kegga(Quantitation_report_with_immune$Hsap_entrez, ALL_Human_genes, species = "Hs")
+
+keggRes <- keggRes %>% 
+  rownames_to_column("kegg") %>%
+  mutate(adjP = p.adjust(P.DE, method = "fdr"))%>%
+  subset(adjP < 0.01) %>%
+  arrange(adjP) %>% # don't forget adjust p-vaules
+  as_tibble()
+
+keggRes 
+```
+
+
+#### Reactome
+```{r}
+enrichPath <- enrichPathway(gene=Quantitation_report_with_immune$Hsap_entrez, pAdjustMethod="fdr", qvalueCutoff=0.05, readable=T, minGSSize = 3, maxGSSize = 300)
+
+as.data.frame(enrichPath)
+cnetplot(enrichPath, showCategory = 5, foldChange = TRUE, categorySize="pvalue", node_label = 'category')
+
+cnetplot(enrichPath, showCategory = 5, foldChange = TRUE, categorySize="pvalue", node_label = 'gene')
+
+```

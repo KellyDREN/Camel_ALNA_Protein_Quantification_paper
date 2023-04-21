@@ -1,0 +1,336 @@
+---
+title: "Find Camel immune genes"
+author: "Kelly Ren"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  bookdown::html_document2: default
+bibliography: FinalthesisRef.bib
+link-citations: yes
+fig_caption: yes
+toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+```{r}
+library(ggplot2)
+library(magrittr)
+library(readr)
+library(dplyr)
+library(stringr)
+library(biomaRt)
+library(ape)
+library(tidyr)
+
+'%!in%' <- function(x,y){!('%in%'(x,y))}
+```
+
+# InnateDB gene 
+
+```{r}
+setwd("~/Documents/Kelly_2021/Research/Tian_Camel_PhD/Kelly_iTRAQ_Data_analysis_11242021")
+```
+
+```{r}
+Human = useMart(biomart="ensembl", dataset="hsapiens_gene_ensembl")
+
+### GO terms match their entrezgene_id and ensembl_gene_id
+ALL_Human_genes <- getBM(
+  attributes= c("ensembl_gene_id", "external_gene_name", "description", "entrezgene_id"), mart= Human)
+
+```
+
+
+```{r}
+InnateDB <- read.csv("InnateDB_genes_all.csv") %>%
+  subset(species %in% "Homo sapiens")
+
+InnateDB <- left_join(InnateDB,ALL_Human_genes,by = c("ensembl" = "ensembl_gene_id"))
+
+InnateDB_Homo_sapiens <- InnateDB[,c("ensembl","entrezgene_id","name","fullname")] %>% 
+  drop_na()
+
+Cbac__v__Hsap <- read_tsv("Cbac__v__Hsap.tsv")
+Cdro__v__Hsap <- read_tsv("Cdro__v__Hsap.tsv")
+Cfer__v__Hsap <- read_tsv("Cfer__v__Hsap.tsv")
+```
+
+# camel vs homo sapiens 
+```{r}
+Cbac__v__Hsap$Hsap %>% head()
+# remove the , in the ID
+Cbac__v__Hsap_Hsap <- unlist(strsplit(Cbac__v__Hsap$Hsap, ", "))
+
+Hsap_InnateDB <- Cbac__v__Hsap_Hsap[Cbac__v__Hsap_Hsap %in% InnateDB_Homo_sapiens$entrezgene_id]
+
+list_Hsap_InnateDB <- lapply(c(1:length(Hsap_InnateDB)), function(x){
+  Cbac__v__Hsap[grep(Hsap_InnateDB[[x]],Cbac__v__Hsap$Hsap),]
+})
+
+list_Hsap_InnateDB %<>% do.call("rbind",.)
+
+InnateDB_Homo_sapiens$entrezgene_id %<>% as.character()
+list_Hsap_InnateDB$Hsap %<>% as.character()
+
+list_Hsap_InnateDB %<>% 
+  left_join(InnateDB_Homo_sapiens, by= c("Hsap"="entrezgene_id")) %>%
+  set_colnames(c("Orthogroup","Cbac","Hsap_entrez","Hsap_ensembl","Hsap_gene_name","Hsap_gene_discription"))
+
+Cbac_list_Hsap_InnateDB <- list_Hsap_InnateDB
+
+list_Hsap_InnateDB_Cbac <- unlist(strsplit(Cbac_list_Hsap_InnateDB$Cbac, ", ")) %>%
+  as.data.frame() %>%
+  set_colnames("entrez_gene")
+```
+
+```{r}
+Cdro__v__Hsap$Hsap %>% head()
+Cdro__v__Hsap_Hsap <- unlist(strsplit(Cdro__v__Hsap$Hsap, ", "))
+
+Hsap_InnateDB <- Cdro__v__Hsap_Hsap[Cdro__v__Hsap_Hsap %in% InnateDB_Homo_sapiens$entrezgene_id]
+
+list_Hsap_InnateDB <- lapply(c(1:length(Hsap_InnateDB)), function(x){
+  Cdro__v__Hsap[grep(Hsap_InnateDB[[x]],Cdro__v__Hsap$Hsap),]
+})
+
+list_Hsap_InnateDB %<>% do.call("rbind",.)
+list_Hsap_InnateDB %<>% left_join(InnateDB_Homo_sapiens, by= c("Hsap"="entrezgene_id")) %>%
+  set_colnames(c("Orthogroup","Cdro","Hsap_entrez","Hsap_ensembl","Hsap_gene_name","Hsap_gene_discription"))
+
+Cdro_list_Hsap_InnateDB <- list_Hsap_InnateDB
+
+list_Hsap_InnateDB_Cdro <- unlist(strsplit(Cdro_list_Hsap_InnateDB$Cdro, ", ")) %>%
+  as.data.frame() %>%
+  set_colnames("entrez_gene")
+```
+
+```{r}
+Cfer__v__Hsap$Hsap %>% head()
+Cfer__v__Hsap_Hsap <- unlist(strsplit(Cfer__v__Hsap$Hsap, ", "))
+
+Hsap_InnateDB <- Cfer__v__Hsap_Hsap[Cfer__v__Hsap_Hsap %in% InnateDB$entrezgene_id]
+
+list_Hsap_InnateDB <- lapply(c(1:length(Hsap_InnateDB)), function(x){
+  Cfer__v__Hsap[grep(Hsap_InnateDB[[x]],Cfer__v__Hsap$Hsap),]
+})
+
+list_Hsap_InnateDB %<>% do.call("rbind",.)
+list_Hsap_InnateDB %<>% left_join(InnateDB_Homo_sapiens, by= c("Hsap"="entrezgene_id")) %>%
+  set_colnames(c("Orthogroup","Cfer","Hsap_entrez","Hsap_ensembl","Hsap_gene_name","Hsap_gene_discription"))
+
+Cfer_list_Hsap_InnateDB <- list_Hsap_InnateDB
+
+list_Hsap_InnateDB_Cfer <- unlist(strsplit(Cfer_list_Hsap_InnateDB$Cfer, ", ")) %>%
+  as.data.frame() %>%
+  set_colnames("entrez_gene")
+```
+
+# match protein and gene
+```{r}
+Ca_bactrianus <- read.gff("GCF_000767855.1_Ca_bactrianus_MBC_1.0_genomic.gff.gz", GFF3 = F)
+Ca_bactrianus <- Ca_bactrianus[grep("Dbxref=GeneID:",Ca_bactrianus$attributes),]
+Ca_bactrianus <- Ca_bactrianus[grep("protein_id=",Ca_bactrianus$attributes),]
+
+Ca_bactrianus_ID <- Ca_bactrianus$attributes %>%
+  gsub(".*Dbxref=GeneID","",.) %>%
+  gsub(";gbkey.*","",.)
+
+Ca_bactrianus_ID <- strsplit(Ca_bactrianus_ID, ";")
+
+Ca_bactrianus_ID <- lapply(Ca_bactrianus_ID, as.data.frame)
+Ca_bactrianus_ID %<>% do.call("rbind",.)
+Ca_bactrianus_ID <- Ca_bactrianus_ID[grep("Genbank",Ca_bactrianus_ID$`X[[i]]`),] %>%
+  as.data.frame() %>%
+  unique() %>%
+  set_colnames("ID")
+
+Ca_bactrianus_ID <- read.table(text = Ca_bactrianus_ID$ID, sep = ",", colClasses = "character")
+Ca_bactrianus_ID$V1 %<>%gsub(":","",.)
+Ca_bactrianus_ID$V2 %<>%gsub("Genbank:","",.)
+```
+
+```{r}
+CamDro3 <- read.gff("GCF_000803125.2_CamDro3_genomic.gff.gz")
+CamDro3 <- CamDro3[grep("Dbxref=GeneID:",CamDro3$attributes),]
+CamDro3 <- CamDro3[grep("protein_id=",CamDro3$attributes),]
+
+CamDro3_ID <- CamDro3$attributes %>%
+  gsub(".*Dbxref=GeneID","",.) %>%
+  gsub(";gbkey.*","",.)
+
+CamDro3_ID <- strsplit(CamDro3_ID, ";")
+
+CamDro3_ID <- lapply(CamDro3_ID, as.data.frame)
+CamDro3_ID %<>% do.call("rbind",.)
+CamDro3_ID <- CamDro3_ID[grep("Genbank",CamDro3_ID$`X[[i]]`),] %>%
+  as.data.frame() %>%
+  unique() %>%
+  set_colnames("ID")
+
+CamDro3_ID <- read.table(text = CamDro3_ID$ID, sep = ",", colClasses = "character")
+CamDro3_ID$V1 %<>% gsub(":","",.)
+CamDro3_ID$V2 %<>% gsub("Genbank:","",.)
+```
+
+```{r}
+BCGSAC <- read.gff("GCF_009834535.1_BCGSAC_Cfer_1.0_genomic.gff.gz")
+BCGSAC <- BCGSAC[grep("Dbxref=GeneID:",BCGSAC$attributes),]
+BCGSAC <- BCGSAC[grep("protein_id=",BCGSAC$attributes),]
+
+BCGSAC_ID <- BCGSAC$attributes %>%
+  gsub(".*Dbxref=GeneID","",.) %>%
+  gsub(";gbkey.*","",.)
+
+BCGSAC_ID <- strsplit(BCGSAC_ID, ";")
+
+BCGSAC_ID <- lapply(BCGSAC_ID, as.data.frame)
+BCGSAC_ID %<>% do.call("rbind",.)
+BCGSAC_ID <- BCGSAC_ID[grep("Genbank",BCGSAC_ID$`X[[i]]`),] %>%
+  as.data.frame() %>%
+  unique() %>%
+  set_colnames("ID")
+
+BCGSAC_ID <- read.table(text = BCGSAC_ID$ID, sep = ",", colClasses = "character")
+BCGSAC_ID$V1 %<>%gsub(":","",.)
+BCGSAC_ID$V2 %<>%gsub("Genbank:","",.)
+```
+
+
+```{r}
+Quantitation_report <- read_csv("Quantitation_report.csv")
+GeneID_ProteinAccession<- rbind(Ca_bactrianus_ID,CamDro3_ID)%>%
+  rbind(BCGSAC_ID) %>%
+  set_colnames(c("entrez_gene","protein"))
+
+table(Quantitation_report$Accession %in% BCGSAC_ID$V2)
+table(Quantitation_report$Accession %in% CamDro3_ID$V2)
+table(Quantitation_report$Accession %in% Ca_bactrianus_ID$V2)
+
+Quantitation_report <- left_join(Quantitation_report,GeneID_ProteinAccession, by= c("Accession" = "protein"))
+Quantitation_report$Immune <- "No"
+list_Hsap_InnateDB_Camel <- rbind(list_Hsap_InnateDB_Cbac,list_Hsap_InnateDB_Cdro) %>%
+  rbind(list_Hsap_InnateDB_Cfer) %>%
+  unique()
+  
+Quantitation_report$Immune[Quantitation_report$entrez_gene %in% c(list_Hsap_InnateDB_Camel$entrez_gene)] <- "Yes"
+
+colnames(Cfer_list_Hsap_InnateDB)[[2]] <- "Camel_ID"
+colnames(Cbac_list_Hsap_InnateDB)[[2]] <- "Camel_ID"
+colnames(Cdro_list_Hsap_InnateDB)[[2]] <- "Camel_ID"
+
+Cdro_list_Hsap_InnateDB <- rbind(Cdro_list_Hsap_InnateDB,Cbac_list_Hsap_InnateDB) %>%
+  rbind(Cfer_list_Hsap_InnateDB)
+
+Quantitation_report %<>% 
+  left_join(Cdro_list_Hsap_InnateDB, by = c("entrez_gene" = "Camel_ID")) %>%
+  unique()
+
+Quantitation_report$Immune[Quantitation_report$Hsap_entrez %!in% InnateDB_Homo_sapiens$entrezgene_id] <- "No"
+Quantitation_report$Immune[is.na(Quantitation_report$Orthogroup)] <- "No"
+
+Quantitation_report %<>%
+  subset(Quantitation_report$Probability == "100.00%")
+
+Quantitation_report%<>%
+  subset(PPS1 %!in% "No Values")%<>%
+  subset(PPS1 %!in% "Reference Missing")
+
+write_csv(Quantitation_report,"Quantitation_report_with_immune.csv")
+```
+
+
+
+
+```{r}
+Quantitation_report <- read_csv("Quantitation_report_LMFR_PPS.csv")
+GeneID_ProteinAccession<- rbind(Ca_bactrianus_ID,CamDro3_ID)%>%
+  rbind(BCGSAC_ID) %>%
+  set_colnames(c("entrez_gene","protein"))
+
+table(Quantitation_report$Accession %in% BCGSAC_ID$V2)
+table(Quantitation_report$Accession %in% CamDro3_ID$V2)
+table(Quantitation_report$Accession %in% Ca_bactrianus_ID$V2)
+
+Quantitation_report <- left_join(Quantitation_report,GeneID_ProteinAccession, by= c("Accession" = "protein"))
+Quantitation_report$Immune <- "No"
+list_Hsap_InnateDB_Camel <- rbind(list_Hsap_InnateDB_Cbac,list_Hsap_InnateDB_Cdro) %>%
+  rbind(list_Hsap_InnateDB_Cfer) %>%
+  unique()
+  
+Quantitation_report$Immune[Quantitation_report$entrez_gene %in% c(list_Hsap_InnateDB_Camel$entrez_gene)] <- "Yes"
+
+colnames(Cfer_list_Hsap_InnateDB)[[2]] <- "Camel_ID"
+colnames(Cbac_list_Hsap_InnateDB)[[2]] <- "Camel_ID"
+colnames(Cdro_list_Hsap_InnateDB)[[2]] <- "Camel_ID"
+
+Cdro_list_Hsap_InnateDB <- rbind(Cdro_list_Hsap_InnateDB,Cbac_list_Hsap_InnateDB) %>%
+  rbind(Cfer_list_Hsap_InnateDB)
+
+Quantitation_report %<>% 
+  left_join(Cdro_list_Hsap_InnateDB, by = c("entrez_gene" = "Camel_ID")) %>%
+  unique()
+
+Quantitation_report$Immune[is.na(Quantitation_report$Orthogroup)] <- "No"
+
+write_csv(Quantitation_report,"Quantitation_report_with_immune.csv")
+```
+
+```{r}
+Quantitation_report <- read_csv("Quantitation_report_RMFR_LMFR.csv")
+GeneID_ProteinAccession<- rbind(Ca_bactrianus_ID,CamDro3_ID)%>%
+  rbind(BCGSAC_ID) %>%
+  set_colnames(c("entrez_gene","protein"))
+
+table(Quantitation_report$Accession %in% BCGSAC_ID$V2)
+table(Quantitation_report$Accession %in% CamDro3_ID$V2)
+table(Quantitation_report$Accession %in% Ca_bactrianus_ID$V2)
+
+Quantitation_report <- left_join(Quantitation_report,GeneID_ProteinAccession, by= c("Accession" = "protein"))
+Quantitation_report$Immune <- "No"
+Quantitation_report$Immune[Quantitation_report$entrez_gene %in% c(list_Hsap_InnateDB_Camel$entrez_gene)] <- "Yes"
+
+
+colnames(Cfer_list_Hsap_InnateDB)[[2]] <- "Camel_ID"
+colnames(Cbac_list_Hsap_InnateDB)[[2]] <- "Camel_ID"
+colnames(Cdro_list_Hsap_InnateDB)[[2]] <- "Camel_ID"
+
+Cdro_list_Hsap_InnateDB <- rbind(Cdro_list_Hsap_InnateDB,Cbac_list_Hsap_InnateDB) %>%
+  rbind(Cfer_list_Hsap_InnateDB)
+
+Quantitation_report %<>% 
+  left_join(Cdro_list_Hsap_InnateDB, by = c("entrez_gene" = "Camel_ID")) %>%
+  unique()
+
+write_csv(Quantitation_report,"Quantitation_report_RMFR_LMFR_with_immune.csv")
+```
+
+```{r}
+Quantitation_report <- read_csv("Quantitation_report_RMFR_PPS.csv")
+GeneID_ProteinAccession<- rbind(Ca_bactrianus_ID,CamDro3_ID)%>%
+  rbind(BCGSAC_ID) %>%
+  set_colnames(c("entrez_gene","protein"))
+
+table(Quantitation_report$Accession %in% BCGSAC_ID$V2)
+table(Quantitation_report$Accession %in% CamDro3_ID$V2)
+table(Quantitation_report$Accession %in% Ca_bactrianus_ID$V2)
+
+Quantitation_report <- left_join(Quantitation_report,GeneID_ProteinAccession, by= c("Accession" = "protein"))
+Quantitation_report$Immune <- "No"
+Quantitation_report$Immune[Quantitation_report$entrez_gene %in% c(list_Hsap_InnateDB_Camel$entrez_gene)] <- "Yes"
+
+colnames(Cfer_list_Hsap_InnateDB)[[2]] <- "Camel_ID"
+colnames(Cbac_list_Hsap_InnateDB)[[2]] <- "Camel_ID"
+colnames(Cdro_list_Hsap_InnateDB)[[2]] <- "Camel_ID"
+
+Cdro_list_Hsap_InnateDB <- rbind(Cdro_list_Hsap_InnateDB,Cbac_list_Hsap_InnateDB) %>%
+  rbind(Cfer_list_Hsap_InnateDB)
+
+Quantitation_report %<>% 
+  left_join(Cdro_list_Hsap_InnateDB, by = c("entrez_gene" = "Camel_ID")) %>%
+  unique()
+
+write_csv(Quantitation_report,"Quantitation_report_RMFR_PPS_with_immune.csv")
+```
+
